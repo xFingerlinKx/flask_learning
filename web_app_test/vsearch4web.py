@@ -4,6 +4,7 @@ from flask import request
 from flask import escape
 # from flask import redirect
 
+from . import log_request
 app = Flask(__name__)
 
 
@@ -24,18 +25,6 @@ def search4letters(phrase: str, letters: str='aeiou') -> set:
     return set(letters).intersection(set(phrase))
 
 
-def log_request(request, res: str) -> None:
-    """
-    Write request and the results in 'vsearch.log'.
-
-    :param request: request obj
-    :param res: result of request
-    :return: None
-    """
-    with open('vsearch.log', 'a') as log:
-        print(request.form, request.remote_addr, request.user_agent, res, file=log, sep='|')
-
-
 @app.route('/search4', methods=['GET', 'POST'])
 def do_search():
     """
@@ -47,8 +36,8 @@ def do_search():
     letters = request.form['letters']
     title = 'Here are your results:'
     results = str(search4letters(phrase, letters))
-
-    log_request(request=request, res=results)
+    # write log request to db
+    log_request.log_request(request=request, res=results)
 
     return render_template(
         template_name_or_list='results.html',
