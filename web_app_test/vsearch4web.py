@@ -2,10 +2,15 @@ from flask import Flask
 from flask import render_template
 from flask import request
 from flask import escape
+
+from .log_request import log_request
+from . import constants
+from .db_context_manager import UseDatabase
 # from flask import redirect
 
-from . import log_request
+
 app = Flask(__name__)
+app.config['db_config'] = constants.db_config
 
 
 # @app.route('/')
@@ -15,6 +20,8 @@ app = Flask(__name__)
 #     :return: code=302
 #     """
 #     return redirect(location='/entry')
+
+
 def search4vowels(phrase: str) -> set:
     """ Returns the set of vowels found in phrase """
     return set('aeiou').intersection(set(phrase))
@@ -28,7 +35,7 @@ def search4letters(phrase: str, letters: str='aeiou') -> set:
 @app.route('/search4', methods=['GET', 'POST'])
 def do_search():
     """
-    Return the result of searching.
+    Извлечение данных из запроса, поиск, логирование (запись) результов в БД.
     :return: HTML
     """
     # 'request.form' --> ImmutableMultiDict([('phrase', 'qweqwe'), ('letters', 'a')])
@@ -37,7 +44,7 @@ def do_search():
     title = 'Here are your results:'
     results = str(search4letters(phrase, letters))
     # write log request to db
-    log_request.log_request(request=request, res=results)
+    log_request(request=request, res=results)
 
     return render_template(
         template_name_or_list='results.html',
@@ -52,7 +59,7 @@ def do_search():
 @app.route('/entry')
 def entry_page():
     """
-    Return the starting page.
+    Стартовая страница с формой запроса (HTML).
     :return: HTML
     """
     return render_template(
@@ -64,19 +71,18 @@ def entry_page():
 @app.route('/viewlog')
 def view_log_file() -> str:
     """
-    Return the contents of the log file in HTML table.
+    Отображение результатов логирования из БД в виде HTML-таблицы.
 
-    :return: {HTML} contents of the log file.
+    :return: {HTML} contents of the logs.
     """
-    contents = []
+    with UseDatabase(app.config['db_config']) as cr:
+        query = """ SELECT phrase, letters, ip, browser_string, results
+                    FROM log;
+        """
+        cr.execute(query)
+        contents = cr.fetchall()
 
-    with open('vsearch.log') as log:
-        for line in log.readlines():
-            contents.append([])
-            for item in line.split('|'):
-                contents[-1].append(escape(item))
-
-    titles = ('Form Data', 'Remote addr', 'User agent', 'Results')
+    titles = ('Phrase', 'Letters', 'Remote addr', 'User agent', 'Results')
 
     return render_template(
         template_name_or_list='log.html',

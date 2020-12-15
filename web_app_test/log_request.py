@@ -1,36 +1,25 @@
-from mysql import connector
-
-
-dbconfig = {
-    'host': '127.0.0.1',
-    'user': 'root',
-    'password': '*******',
-    'database': 'vsearch_log'
-}
+from .db_context_manager import UseDatabase
+from . import constants
 
 
 def log_request(request, res: str) -> None:
     """
-    Write request and the results in 'log' table 'vsearch_log' db.
+    Запись результатов запроса в таблицу 'log' БД 'vsearch_log'.
 
-    :param request: request obj
-    :param res: result of request
+    :param request: {obj} объект запроса
+    :param res: {str} результат запроса
     :return: None
     """
-    conn = connector.connect(**dbconfig)
-    cr = conn.cursor()
-    query = """ INSERT INTO log (phrase, letters, ip, browser_string, results)
-                VALUES (%s, %s, %s, %s, %s);
-    """
-    cr.execute(
-        query, (
-            request.form['phrase'],
-            request.form['letters'],
-            request.remote_addr,
-            request.user_agent.browser,
-            res,
+    with UseDatabase(constants.db_config) as cr:
+        query = """ INSERT INTO log (phrase, letters, ip, browser_string, results)
+                    VALUES (%s, %s, %s, %s, %s);
+            """
+        cr.execute(
+            query, (
+                request.form['phrase'],
+                request.form['letters'],
+                request.remote_addr,
+                request.user_agent.browser,
+                res,
+            )
         )
-    )
-    conn.commit()
-    cr.close()
-    conn.close()
