@@ -1,16 +1,21 @@
 from flask import Flask
 from flask import render_template
 from flask import request
+from flask import session
 from flask import escape
 
 from .log_request import log_request
 from . import constants
 from .db_context_manager import UseDatabase
+
+from .checker import check_logged_in
+
 # from flask import redirect
 
 
 app = Flask(__name__)
 app.config['db_config'] = constants.db_config
+app.secret_key = 'YouWillNeverGuessMySecretKey'
 
 
 # @app.route('/')
@@ -68,7 +73,20 @@ def entry_page():
     )
 
 
+@app.route('/login')
+def do_login():
+    session['logged_in'] = True
+    return 'You are logged in.'
+
+
+@app.route('/logout')
+def do_logout():
+    session.pop('logged_in')
+    return 'You are logged out.'
+
+
 @app.route('/viewlog')
+@check_logged_in
 def view_log_file() -> str:
     """
     Отображение результатов логирования из БД в виде HTML-таблицы.

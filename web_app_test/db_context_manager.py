@@ -24,6 +24,7 @@ class UseDatabase:
 
         :return: {obj} объект курсора для подключения к БД
         """
+        # TODO: необходимо добавить обработку ошибок при установке соединения с БД
         self.conn = connector.connect(**self.configuration)
         self.cr = self.conn.cursor()
         return self.cr
