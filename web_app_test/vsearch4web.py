@@ -6,7 +6,7 @@ from flask import escape
 
 from .log_request import log_request
 from . import constants
-from .db_context_manager import UseDatabase
+from .db_context_manager import UseDatabase, ConnectionDbError
 
 from .checker import check_logged_in
 
@@ -48,8 +48,12 @@ def do_search():
     letters = request.form['letters']
     title = 'Here are your results:'
     results = str(search4letters(phrase, letters))
-    # write log request to db
-    log_request(request=request, res=results)
+
+    try:
+        # write log request to db
+        log_request(request=request, res=results)
+    except Exception as err:
+        print(f'***** Logging failed with this error: {err} ******')
 
     return render_template(
         template_name_or_list='results.html',
@@ -93,22 +97,28 @@ def view_log_file() -> str:
 
     :return: {HTML} contents of the logs.
     """
-    with UseDatabase(app.config['db_config']) as cr:
-        query = """ SELECT phrase, letters, ip, browser_string, results
-                    FROM log;
-        """
-        cr.execute(query)
-        contents = cr.fetchall()
+    try:
+        with UseDatabase(app.config['db_config']) as cr:
+            query = """ SELECT phrase, letters, ip, browser_string, results
+                        FROM log;
+            """
+            cr.execute(query)
+            contents = cr.fetchall()
 
-    titles = ('Phrase', 'Letters', 'Remote addr', 'User agent', 'Results')
+        titles = ('Phrase', 'Letters', 'Remote addr', 'User agent', 'Results')
 
-    return render_template(
-        template_name_or_list='log.html',
-        the_title='The log file results',
-        the_row_titles=titles,
-        the_data=contents,
-    )
+        return render_template(
+            template_name_or_list='log.html',
+            the_title='The log file results',
+            the_row_titles=titles,
+            the_data=contents,
+        )
 
+    except ConnectionDbError as err:
+        print(f'***** Logging failed with this error: {err} ******')
+    except Exception as err:
+        print(f'***** Something went wrong with: {err} ******')
+    return 'ERROR'
 
 if __name__ == '__main__':
     app.run(debug=True)

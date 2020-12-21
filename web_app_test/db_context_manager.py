@@ -1,4 +1,9 @@
 from mysql import connector
+from mysql.connector import errors
+
+
+class ConnectionDbError(Exception):
+    pass
 
 
 class UseDatabase:
@@ -24,10 +29,14 @@ class UseDatabase:
 
         :return: {obj} объект курсора для подключения к БД
         """
-        # TODO: необходимо добавить обработку ошибок при установке соединения с БД
-        self.conn = connector.connect(**self.configuration)
-        self.cr = self.conn.cursor()
-        return self.cr
+        try:
+            self.conn = connector.connect(**self.configuration)
+            self.cr = self.conn.cursor()
+            return self.cr
+        except errors.InterfaceError as err:
+            raise ConnectionDbError(str(err))
+        except errors.ProgrammingError as err:
+            raise ConnectionDbError(str(err))
 
     def __exit__(self, exc_type, exc_value, exc_trace):
         """
