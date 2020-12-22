@@ -6,7 +6,7 @@ from flask import escape
 
 from .log_request import log_request
 from . import constants
-from .db_context_manager import UseDatabase, ConnectionDbError
+from .db_context_manager import UseDatabase, ConnectionDbError, CredentialsDbError, SQLError
 
 from .checker import check_logged_in
 
@@ -50,7 +50,7 @@ def do_search():
     results = str(search4letters(phrase, letters))
 
     try:
-        # write log request to db
+        # запись лога в БД
         log_request(request=request, res=results)
     except Exception as err:
         print(f'***** Logging failed with this error: {err} ******')
@@ -116,6 +116,10 @@ def view_log_file() -> str:
 
     except ConnectionDbError as err:
         print(f'***** Logging failed with this error: {err} ******')
+    except CredentialsDbError as err:
+        print(f'***** User-id/Pssword issues. Error: {err} ******')
+    except SQLError as err:
+        print(f'***** Is your query correct? Error: {err} *****')
     except Exception as err:
         print(f'***** Something went wrong with: {err} ******')
     return 'ERROR'

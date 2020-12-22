@@ -6,6 +6,13 @@ class ConnectionDbError(Exception):
     pass
 
 
+class CredentialsDbError(Exception):
+    pass
+
+
+class SQLError(Exception):
+    pass
+
 class UseDatabase:
     """
     Класс диспетчера контекста для контекстного
@@ -36,7 +43,9 @@ class UseDatabase:
         except errors.InterfaceError as err:
             raise ConnectionDbError(str(err))
         except errors.ProgrammingError as err:
-            raise ConnectionDbError(str(err))
+            raise CredentialsDbError(str(err))
+        except errors.DataError as err:
+            raise SQLError(str(err))
 
     def __exit__(self, exc_type, exc_value, exc_trace):
         """
@@ -49,3 +58,11 @@ class UseDatabase:
         self.conn.commit()
         self.cr.close()
         self.conn.close()
+
+        # обработка непредвиденных исключений, которые возникнут в случае, если не завершится блок __enter__
+        # если блок __enter__ не завершится в __exit__ передается кортеж значений (exc_type, exc_value, exc_trace)
+        # если блок __enter__ завершится в __exit__ передается None в кортеж (exc_type, exc_value, exc_trace)
+        if exc_type is errors.ProgrammingError:
+            raise SQLError(exc_type)
+        elif exc_type:
+            raise exc_type(str(exc_value))
