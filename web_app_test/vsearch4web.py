@@ -1,10 +1,12 @@
+from threading import Thread
+
 from flask import Flask
 from flask import render_template
 from flask import request
 from flask import session
+from flask import copy_current_request_context
 from flask import escape
 
-from .log_request import log_request
 from . import constants
 from .db_context_manager import UseDatabase, ConnectionDbError, CredentialsDbError, SQLError
 
@@ -43,6 +45,33 @@ def do_search():
     Извлечение данных из запроса, поиск, логирование (запись) результов в БД.
     :return: HTML
     """
+    # декоратор @copy_current_request_context гарантирует, что HTTP-запрос, который активен в момент вызова функции,
+    # останется активным, когда функция позже запустится в отдельном потоке.
+    # !!! Декорируемая функция должна быть определна внутри функции, которая ее вызывает,
+    # т.е. она должна быть вложена в вызывающую ее функцию.
+    @copy_current_request_context
+    def log_request(request_obj, res: str) -> None:
+        """
+        Запись результатов запроса в таблицу 'log' БД 'vsearch_log'.
+
+        :param request_obj: {obj} объект запроса
+        :param res: {str} результат запроса
+        :return: None
+        """
+        with UseDatabase(constants.db_config) as cr:
+            query = """ INSERT INTO log (phrase, letters, ip, browser_string, results)
+                        VALUES (%s, %s, %s, %s, %s);
+                """
+            cr.execute(
+                query, (
+                    request_obj.form['phrase'],
+                    request_obj.form['letters'],
+                    request_obj.remote_addr,
+                    request_obj.user_agent.browser,
+                    res,
+                )
+            )
+
     # 'request.form' --> ImmutableMultiDict([('phrase', 'qweqwe'), ('letters', 'a')])
     phrase = request.form['phrase']
     letters = request.form['letters']
@@ -51,9 +80,14 @@ def do_search():
 
     try:
         # запись лога в БД
-        log_request(request=request, res=results)
+        # запускаем в отдельном потоке, чтобы исключить проблемы при продолжительном времени выполнения
+        thread = Thread(
+            target=log_request,
+            args=(request, results)
+        )
+        thread.start()
     except Exception as err:
-        print(f'***** Logging failed with this error: {err} ******')
+        print(f'***** Something went wrong with: {err} ******')
 
     return render_template(
         template_name_or_list='results.html',

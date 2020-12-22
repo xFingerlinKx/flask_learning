@@ -13,6 +13,7 @@ class CredentialsDbError(Exception):
 class SQLError(Exception):
     pass
 
+
 class UseDatabase:
     """
     Класс диспетчера контекста для контекстного
